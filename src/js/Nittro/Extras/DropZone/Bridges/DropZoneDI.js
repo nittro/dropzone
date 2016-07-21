@@ -1,4 +1,4 @@
-_context.invoke(function() {
+_context.invoke('Nittro.Extras.DropZone.Bridges', function() {
 
     var DropZoneDI = _context.extend('Nittro.DI.BuilderExtension', function(containerBuilder, config) {
         DropZoneDI.Super.call(containerBuilder, config);
@@ -7,5 +7,7 @@ _context.invoke(function() {
             this._getContainerBuilder().addFactory('dropZone', 'Nittro.Extras.DropZone.DropZone::create()');
         }
     });
+
+    _context.register(DropZoneDI, 'DropZoneDI')
 
 });
