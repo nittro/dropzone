@@ -1,4 +1,4 @@
-_context.invoke('Nittro.Widgets', function(Form, Vendor, DOM, Arrays, Strings) {
+_context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, Strings) {
 
     var DropZone = _context.extend('Nittro.Object', function(form, elem, options) {
         DropZone.Super.call(this);
@@ -483,4 +483,16 @@ _context.invoke('Nittro.Widgets', function(Form, Vendor, DOM, Arrays, Strings) {
     Arrays: 'Utils.Arrays',
     Strings: 'Utils.Strings',
     DOM: 'Utils.DOM'
+});
+;
+_context.invoke(function() {
+    
+    var DropZoneDI = _context.extend('Nittro.DI.BuilderExtension', function(containerBuilder, config) {
+        DropZoneDI.Super.call(containerBuilder, config);
+    }, {
+        load: function() {
+            this._getContainerBuilder().addFactory('dropZone', 'Nittro.Widgets.DropZone::create()');
+        }
+    });
+    
 });

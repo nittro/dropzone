@@ -1,5 +1,10 @@
 module.exports = function(grunt) {
 
+    var files = [
+        'src/js/Nittro/Extras/DropZone/DropZone.js',
+        'src/js/Nittro/Extras/DropZone/Bridges/DropZoneDI.js'
+    ];
+
     grunt.initConfig({
         pkg: grunt.file.readJSON('package.json'),
 
@@ -10,9 +15,7 @@ module.exports = function(grunt) {
             },
             dropzone: {
                 files: {
-                    'dist/js/nittro-dropzone.min.js': [
-                        'src/js/Nittro/Widgets/DropZone.js'
-                    ]
+                    'dist/js/nittro-extras-dropzone.min.js': files
                 }
             }
         },
@@ -23,9 +26,7 @@ module.exports = function(grunt) {
             },
             dropzone: {
                 files: {
-                    'dist/js/nittro-dropzone.js': [
-                        'src/js/Nittro/Widgets/DropZone.js'
-                    ]
+                    'dist/js/nittro-extras-dropzone.js': files
                 }
             }
         }

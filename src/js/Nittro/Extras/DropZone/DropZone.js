@@ -1,4 +1,4 @@
-_context.invoke('Nittro.Widgets', function(Form, Vendor, DOM, Arrays, Strings) {
+_context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, Strings) {
 
     var DropZone = _context.extend('Nittro.Object', function(form, elem, options) {
         DropZone.Super.call(this);
