@@ -1,0 +1,13 @@
+{
+    "files": {
+        "js": [
+            "src/js/Nittro/Extras/DropZone/DropZone.js",
+            "src/js/Nittro/Extras/DropZone/Bridges/DropZoneDI.js"
+        ]
+    },
+    "compat": {
+        "es5": true,
+        "filesApi": true,
+        "dragdrop": true
+    }
+}
