@@ -92,6 +92,10 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
                 allowedTypes: null,
                 maxSize: null,
                 multiple: true,
+                netteValidate: {
+                    perFile: true,
+                    onSubmit: true
+                },
 
                 messages: {
                     empty: 'This field is required.',
@@ -242,7 +246,10 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
         },
 
         validate: function(evt) {
-            if (this._.options.required && !this._.files.length) {
+            if (this._.options.netteValidate.perFile && this._.field && this._.rules && !Vendor.validateControl(this._.field, this._.rules, false, { value: this._.files })) {
+                evt.preventDefault();
+                
+            } else if (this._.options.required && !this._.files.length) {
                 evt.preventDefault();
                 this.trigger('error', { message: this._formatErrorMessage('empty') });
 
@@ -272,11 +279,6 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
 
             }
 
-            if (this._.field && this._.rules && !Vendor.validateControl(this._.field, this._.rules, false, { value: files })) {
-                return;
-
-            }
-
             var errors = [],
                 evt;
 
@@ -294,8 +296,10 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
                 }
             } catch (e) {
                 if (e instanceof ValidationError) {
-                    errors.push(e.message);
+                    if (!(e instanceof NetteValidationError)) {
+                        errors.push(e.message);
 
+                    }
                 } else {
                     throw e;
 
@@ -309,7 +313,10 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
         },
 
         _validateFile: function(file) {
-            if (!this._validateType(file.name, file.type)) {
+            if (this._.options.netteValidate.perFile && this._.field && this._.rules && !Vendor.validateControl(this._.field, this._.rules, false, { value: [file] })) {
+                throw new NetteValidationError();
+
+            } else if (!this._validateType(file.name, file.type)) {
                 throw new ValidationError(this._formatErrorMessage('invalidType', [file.name, file.type]));
 
             } else if (!this._validateSize(file.size)) {
@@ -473,6 +480,10 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
 
     var ValidationError = _context.extend(Error, function(message) {
         ValidationError.Super.call(this, message);
+    });
+
+    var NetteValidationError = _context.extend(ValidationError, function() {
+        ValidationError.Super.call(this);
     });
 
     _context.register(DropZone, 'DropZone');
