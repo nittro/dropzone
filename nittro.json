@@ -5,6 +5,7 @@
             "src/js/Nittro/Extras/DropZone/Bridges/DropZoneDI.js"
         ]
     },
+    "di": "Nittro.Extras.DropZone.Bridges.DropZoneDI()",
     "compat": {
         "es5": true,
         "filesApi": true,
