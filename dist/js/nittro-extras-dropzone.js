@@ -12,6 +12,7 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
         this._.options = Arrays.mergeTree({}, DropZone.defaults, options);
 
         this.validate = this.validate.bind(this);
+        this.reset = this.reset.bind(this);
         this._serialize = this._serialize.bind(this);
         this._handleDragEvent = this._handleDragEvent.bind(this);
         this._handleDrop = this._handleDrop.bind(this);
@@ -20,6 +21,7 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
         if (this._.form) {
             this._.form.on('validate', this.validate);
             this._.form.on('serialize', this._serialize);
+            this._.form.on('reset', this.reset);
 
             this.on('error:default', function(evt) {
                 this._.form.trigger('error', {
@@ -227,6 +229,11 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
 
         },
 
+        reset: function() {
+            this._.files = [];
+            return this;
+        },
+
         destroy: function() {
             this.detach();
             this.off();
@@ -248,7 +255,7 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
         validate: function(evt) {
             if (this._.options.netteValidate.perFile && this._.field && this._.rules && !Vendor.validateControl(this._.field, this._.rules, false, { value: this._.files })) {
                 evt.preventDefault();
-                
+
             } else if (this._.options.required && !this._.files.length) {
                 evt.preventDefault();
                 this.trigger('error', { message: this._formatErrorMessage('empty') });
