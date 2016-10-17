@@ -1,11 +1,19 @@
 {
     "files": {
         "js": [
-            "src/js/Nittro/Extras/DropZone/DropZone.js",
-            "src/js/Nittro/Extras/DropZone/Bridges/DropZoneDI.js"
+            "src/js/Nittro/Extras/DropZone/DropZone.js"
         ]
     },
-    "di": "Nittro.Extras.DropZone.Bridges.DropZoneDI()",
+    "bridges": {
+        "nittro-di": {
+            "files": [
+                "src/js/Nittro/Extras/DropZone/Bridges/DropZoneDI/DropZoneExtension.js"
+            ],
+            "extensions": {
+                "dropzone": "Nittro.Extras.DropZone.Bridges.DropZoneDI.DropZoneExtension()"
+            }
+        }
+    },
     "compat": {
         "es5": true,
         "filesApi": true,
