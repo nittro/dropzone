@@ -1,13 +1,13 @@
 {
     "files": {
         "js": [
-            "src/js/Nittro/Extras/DropZone/DropZone.js"
+            "src/DropZone.js"
         ]
     },
     "bridges": {
         "nittro-di": {
             "files": [
-                "src/js/Nittro/Extras/DropZone/Bridges/DropZoneDI/DropZoneExtension.js"
+                "src/Bridges/DropZoneDI/DropZoneExtension.js"
             ],
             "extensions": {
                 "dropzone": "Nittro.Extras.DropZone.Bridges.DropZoneDI.DropZoneExtension()"
