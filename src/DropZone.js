@@ -1,11 +1,13 @@
 _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, Strings) {
 
+    var anonId = 0;
+
+
     var DropZone = _context.extend('Nittro.Object', function(form, elem, options) {
         DropZone.Super.call(this);
 
         this._.form = form || null;
         this._.elem = null;
-        this._.field = null;
         this._.rules = null;
         this._.files = [];
         this._.dragElems = [];
@@ -25,7 +27,7 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
 
             this.on('error:default', function(evt) {
                 this._.form.trigger('error', {
-                    elem: this._.field || this._.elem,
+                    element: this._.field || this._.elem,
                     message: evt.data.message
                 });
             }.bind(this));
@@ -42,25 +44,29 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
         }
 
         if (this._.options.field) {
-            this._.field = this._.options.field;
-            this._.rules = DOM.getData(this._.field, 'nette-rules');
-            this._.options.fieldName = this._.field.name;
-            this._.options.required = this._.field.required;
-            this._.options.multiple = this._.field.multiple;
+            this._.rules = DOM.getData(this._.options.field, 'nette-rules');
+            this._.options.fieldName = this._.options.field.name;
+            this._.options.required = this._.options.field.required;
+            this._.options.multiple = this._.options.field.multiple;
 
-            if (this._.field.accept) {
-                this._.options.allowedTypes = this._normalizeTypes(this._.field.accept);
+            if (this._.options.field.accept) {
+                this._.options.allowedTypes = this._normalizeTypes(this._.options.field.accept);
 
             } else if (this._.options.allowedTypes) {
-                this._.field.accept = this._formatAccept(this._.options.allowedTypes);
+                this._.options.field.accept = this._formatAccept(this._.options.allowedTypes);
 
             }
 
-            this._.options.field = null;
-            this._.field.required = false;
-            this._.field.removeAttribute('data-nette-rules');
+            this._.options.field.required = false;
+            this._.options.field.removeAttribute('data-nette-rules');
 
-            DOM.addListener(this._.field, 'change', this._handleFieldChange);
+            if (!this._.options.field.hasAttribute('id')) {
+                this._.options.field.setAttribute('id', 'dropzone-field' + (++anonId));
+            }
+
+            this._.options.field = this._.options.field.getAttribute('id');
+
+            DOM.addListener(document, 'change', this._handleFieldChange);
 
         }
 
@@ -238,7 +244,6 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
             this.detach();
             this.off();
             this._.files = [];
-            this._.form = null;
 
             if (this._.form) {
                 this._.form.off('validate', this.validate);
@@ -246,14 +251,16 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
 
             }
 
-            if (this._.field) {
-                DOM.removeListener(this._.field, 'change', this._handleFieldChange);
+            this._.form = null;
+
+            if (this._hasField()) {
+                DOM.removeListener(document, 'change', this._handleFieldChange);
 
             }
         },
 
         validate: function(evt) {
-            if (this._.options.netteValidate.perFile && this._.field && this._.rules && !Vendor.validateControl(this._.field, this._.rules, false, { value: this._.files })) {
+            if (this._.options.netteValidate.perFile && this._hasField() && this._.rules && !Vendor.validateControl(this._getField(), this._.rules, false, { value: this._.files })) {
                 evt.preventDefault();
 
             } else if (this._.options.required && !this._.files.length) {
@@ -277,6 +284,14 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
 
         },
 
+        _hasField: function () {
+            return !!this._.options.field;
+        },
+
+        _getField: function () {
+            return this._.options.field ? DOM.getById(this._.options.field) : null;
+        },
+
         _addFiles: function(files) {
             var i = 0,
                 n = this._.options.multiple ? files.length : 1;
@@ -286,8 +301,7 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
 
             }
 
-            var errors = [],
-                evt;
+            var evt;
 
             for (; i < n; i++) try {
                 this._validateFile(files.item(i));
@@ -304,7 +318,7 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
             } catch (e) {
                 if (e instanceof ValidationError) {
                     if (!(e instanceof NetteValidationError)) {
-                        errors.push(e.message);
+                        this.trigger('error', { message: e.message });
 
                     }
                 } else {
@@ -312,15 +326,10 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
 
                 }
             }
-
-            if (errors.length) {
-                this.trigger('error', { message: errors.join("\n") });
-
-            }
         },
 
         _validateFile: function(file) {
-            if (this._.options.netteValidate.perFile && this._.field && this._.rules && !Vendor.validateControl(this._.field, this._.rules, false, { value: [file] })) {
+            if (this._.options.netteValidate.perFile && this._hasField() && this._.rules && !Vendor.validateControl(this._getField(), this._.rules, false, { value: [file] })) {
                 throw new NetteValidationError();
 
             } else if (!this._validateType(file.name, file.type)) {
@@ -353,13 +362,18 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
             return !this._.options.maxSize || size <= this._.options.maxSize;
         },
 
-        _handleFieldChange: function() {
-            if (this._.field.files.length) {
-                this._addFiles(this._.field.files);
+        _handleFieldChange: function(evt) {
+            if (this._hasField() && evt.target === this._getField()) {
+                if (evt.target.files.length) {
+                    this._addFiles(evt.target.files);
 
-                if (this._.form) {
-                    this._.form.setValue(this._.options.fieldName, null);
+                    if (this._.form) {
+                        this._.form.setValue(this._.options.fieldName, null);
 
+                    } else {
+                        var html = evt.target.parentNode.innerHTML;
+                        DOM.html(evt.target.parentNode, html);
+                    }
                 }
             }
         },
