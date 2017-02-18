@@ -317,13 +317,9 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
                 }
             } catch (e) {
                 if (e instanceof ValidationError) {
-                    if (!(e instanceof NetteValidationError)) {
-                        this.trigger('error', { message: e.message });
-
-                    }
-                } else {
+                    this.trigger('error', { message: e.message });
+                } else if (!(e instanceof NetteValidationError)) {
                     throw e;
-
                 }
             }
         },
@@ -499,12 +495,12 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
         }
     });
 
-    var ValidationError = _context.extend(Error, function(message) {
-        ValidationError.Super.call(this, message);
+    var ValidationError = _context.extend(function(message) {
+        this.message = message;
     });
 
-    var NetteValidationError = _context.extend(ValidationError, function() {
-        ValidationError.Super.call(this);
+    var NetteValidationError = _context.extend(function() {
+
     });
 
     _context.register(DropZone, 'DropZone');
