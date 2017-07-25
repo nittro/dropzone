@@ -249,6 +249,8 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
         },
 
         destroy: function() {
+            this.trigger('destroy');
+
             this.detach();
             this.off();
             this._.files = [];
@@ -256,7 +258,7 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
             if (this._.form) {
                 this._.form.off('validate', this.validate);
                 this._.form.off('serialize', this._serialize);
-
+                this._.form.off('reset', this.reset);
             }
 
             this._.form = null;
