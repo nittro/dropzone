@@ -138,6 +138,14 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
             }
         },
 
+        isAttached: function () {
+            return !!this._.elem;
+        },
+
+        getElement: function () {
+            return this._.elem;
+        },
+
         setAllowedTypes: function(allowedTypes) {
             this._.options.allowedTypes = allowedTypes ? this._normalizeTypes(allowedTypes) : null;
             return this;
