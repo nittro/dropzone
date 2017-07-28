@@ -387,21 +387,18 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
         _handleDrop: function(evt) {
             this._.dragElems = [];
 
-            if (evt.defaultPrevented) {
+            if (evt.defaultPrevented || !this._.elem || !(evt.target === this._.elem || DOM.contains(this._.elem, evt.target))) {
                 return;
-
             }
 
             evt.preventDefault();
 
             var drop = this.trigger('drop', {
-                target: evt.target,
-                allowed: evt.target === this._.elem || DOM.contains(this._.elem, evt.target)
+                files: evt.dataTransfer.files
             });
 
-            if (drop.data.allowed) {
+            if (!drop.isDefaultPrevented()) {
                 this._addFiles(evt.dataTransfer.files);
-
             }
         },
 
