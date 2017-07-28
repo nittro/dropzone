@@ -313,23 +313,28 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
 
             var evt;
 
-            for (; i < n; i++) try {
-                this._validateFile(files.item(i));
+            for (; i < n; i++) {
+                try {
+                    this._validateFile(files.item(i));
 
-                evt = this.trigger('file', {
-                    file: files.item(i),
-                    index: this._.files.length
-                });
+                    evt = this.trigger('file', {
+                        file: files.item(i),
+                        index: this._.files.length
+                    });
 
-                if (!evt.isDefaultPrevented()) {
-                    this._.files.push(files.item(i));
+                    if (!evt.isDefaultPrevented()) {
+                        this._.files.push(files.item(i));
 
-                }
-            } catch (e) {
-                if (e instanceof ValidationError) {
-                    this.trigger('error', { message: e.message });
-                } else if (!(e instanceof NetteValidationError)) {
-                    throw e;
+                    }
+                } catch (e) {
+                    if (e instanceof ValidationError) {
+                        this.trigger('error', {
+                            message: e.message,
+                            file: files.item(i)
+                        });
+                    } else if (!(e instanceof NetteValidationError)) {
+                        throw e;
+                    }
                 }
             }
         },
