@@ -107,8 +107,6 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
         },
 
         attach: function(elem) {
-            this.detach();
-
             this._.dragElems = [];
             this._.elems.push(elem);
 
@@ -118,6 +116,8 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
                 DOM.addListener(document.body, 'dragleave', this._handleDragEvent);
                 DOM.addListener(document.body, 'drop', this._handleDrop);
             }
+
+            return this;
         },
 
         detach: function() {
@@ -128,8 +128,9 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
                 DOM.removeListener(document.body, 'drop', this._handleDrop);
                 this._.dragElems = [];
                 this._.elems = [];
-
             }
+
+            return this;
         },
 
         isAttached: function () {
