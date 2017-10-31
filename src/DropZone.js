@@ -7,7 +7,7 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
         DropZone.Super.call(this);
 
         this._.form = form || null;
-        this._.elem = null;
+        this._.elems = [];
         this._.rules = null;
         this._.files = [];
         this._.dragElems = [];
@@ -27,7 +27,7 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
 
             this.on('error:default', function(evt) {
                 this._.form.trigger('error', {
-                    element: this._.field || this._.elem,
+                    element: this._.field || this.getElement(),
                     message: evt.data.message
                 });
             }.bind(this));
@@ -35,12 +35,10 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
 
         if (this._.options.allowedTypes) {
             this._.options.allowedTypes = this._normalizeTypes(this._.options.allowedTypes);
-
         }
 
         if (this._.options.maxSize) {
             this._.options.maxSize = this._normalizeMaxSize(this._.options.maxSize);
-
         }
 
         if (this._.options.field) {
@@ -51,10 +49,8 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
 
             if (this._.options.field.accept) {
                 this._.options.allowedTypes = this._normalizeTypes(this._.options.field.accept);
-
             } else if (this._.options.allowedTypes) {
                 this._.options.field.accept = this._formatAccept(this._.options.allowedTypes);
-
             }
 
             this._.options.field.required = false;
@@ -67,19 +63,16 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
             this._.options.field = this._.options.field.getAttribute('id');
 
             DOM.addListener(document, 'change', this._handleFieldChange);
-
         }
 
         if (elem) {
             this.attach(elem);
-
         }
     }, {
         STATIC: {
             create: function(formLocator, from) {
                 if (!(from instanceof HTMLInputElement) || from.type !== 'file') {
                     throw new Error('Invalid argument, must be a file input');
-
                 }
 
                 var form = from.form ? formLocator.getForm(from.form) : null;
@@ -117,83 +110,79 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
             this.detach();
 
             this._.dragElems = [];
-            this._.elem = elem;
+            this._.elems.push(elem);
 
-            DOM.addListener(document.body, 'dragenter', this._handleDragEvent);
-            DOM.addListener(document.body, 'dragover', this._handleDragEvent);
-            DOM.addListener(document.body, 'dragleave', this._handleDragEvent);
-            DOM.addListener(document.body, 'drop', this._handleDrop);
-
+            if (this._.elems.length === 1) {
+                DOM.addListener(document.body, 'dragenter', this._handleDragEvent);
+                DOM.addListener(document.body, 'dragover', this._handleDragEvent);
+                DOM.addListener(document.body, 'dragleave', this._handleDragEvent);
+                DOM.addListener(document.body, 'drop', this._handleDrop);
+            }
         },
 
         detach: function() {
-            if (this._.elem) {
+            if (this._.elems.length) {
                 DOM.removeListener(document.body, 'dragenter', this._handleDragEvent);
                 DOM.removeListener(document.body, 'dragover', this._handleDragEvent);
                 DOM.removeListener(document.body, 'dragleave', this._handleDragEvent);
                 DOM.removeListener(document.body, 'drop', this._handleDrop);
                 this._.dragElems = [];
-                this._.elem = null;
+                this._.elems = [];
 
             }
         },
 
         isAttached: function () {
-            return !!this._.elem;
+            return this._.elems.length > 0;
         },
 
         getElement: function () {
-            return this._.elem;
+            return this._.elems.length ? this._.elems[0] : null;
+        },
+
+        getElements: function() {
+            return this._.elems;
         },
 
         setAllowedTypes: function(allowedTypes) {
             this._.options.allowedTypes = allowedTypes ? this._normalizeTypes(allowedTypes) : null;
             return this;
-
         },
 
         setMaxSize: function(size) {
             this._.options.maxSize = size ? this._normalizeMaxSize(size) : null;
             return this;
-
         },
 
         setRequired: function(required) {
             this._.options.required = required !== false;
             return this;
-
         },
 
         setMultiple: function(multiple) {
             this._.options.multiple = multiple !== false;
             return this;
-
         },
 
         setFieldName: function(fieldName) {
             this._.options.fieldName = fieldName;
             return this;
-
         },
 
         hasFiles: function() {
             return this._.files.length > 0;
-
         },
 
         getFiles: function() {
             return this._.files.slice();
-
         },
 
         getFile: function(index) {
             return this._.files[index] || null;
-
         },
 
         isImage: function(file) {
             return /^image\/.+$/i.test(file.type);
-
         },
 
         loadImages: function() {
@@ -206,7 +195,6 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
             }.bind(this));
 
             return Promise.all(queue);
-
         },
 
         loadImage: function(file) {
@@ -224,8 +212,48 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
                 };
 
                 reader.readAsDataURL(file);
-
             });
+        },
+
+        addFiles: function(files) {
+            var i = 0,
+                n = this._.options.multiple ? files.length : 1;
+
+            if (!this._.options.multiple) {
+                this._.files = [];
+            }
+
+            for (; i < n; i++) {
+                this.addFile(files instanceof FileList ? files.item(i) : files[i]);
+            }
+
+            return this;
+        },
+
+        addFile: function (file) {
+            try {
+                this._validateFile(file);
+
+                var evt = this.trigger('file', {
+                    file: file,
+                    index: this._.files.length
+                });
+
+                if (!evt.isDefaultPrevented()) {
+                    this._.files.push(file);
+                }
+            } catch (e) {
+                if (e instanceof ValidationError) {
+                    this.trigger('error', {
+                        message: e.message,
+                        file: file
+                    });
+                } else if (!(e instanceof NetteValidationError)) {
+                    throw e;
+                }
+            }
+
+            return this;
         },
 
         removeFile: function(file) {
@@ -294,49 +322,19 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
 
         },
 
+        _isValidTarget: function (elem, withDescendants) {
+            return this._.elems.length > 0 && (
+                this._.elems.indexOf(elem) > -1 ||
+                withDescendants && this._.elems.some(function(el) { return DOM.contains(el, elem); })
+            );
+        },
+
         _hasField: function () {
             return !!this._.options.field;
         },
 
         _getField: function () {
             return this._.options.field ? DOM.getById(this._.options.field) : null;
-        },
-
-        _addFiles: function(files) {
-            var i = 0,
-                n = this._.options.multiple ? files.length : 1;
-
-            if (!this._.options.multiple) {
-                this._.files = [];
-
-            }
-
-            var evt;
-
-            for (; i < n; i++) {
-                try {
-                    this._validateFile(files.item(i));
-
-                    evt = this.trigger('file', {
-                        file: files.item(i),
-                        index: this._.files.length
-                    });
-
-                    if (!evt.isDefaultPrevented()) {
-                        this._.files.push(files.item(i));
-
-                    }
-                } catch (e) {
-                    if (e instanceof ValidationError) {
-                        this.trigger('error', {
-                            message: e.message,
-                            file: files.item(i)
-                        });
-                    } else if (!(e instanceof NetteValidationError)) {
-                        throw e;
-                    }
-                }
-            }
         },
 
         _validateFile: function(file) {
@@ -376,7 +374,7 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
         _handleFieldChange: function(evt) {
             if (this._hasField() && evt.target === this._getField()) {
                 if (evt.target.files.length) {
-                    this._addFiles(evt.target.files);
+                    this.addFiles(evt.target.files);
 
                     if (this._.form) {
                         this._.form.setValue(this._.options.fieldName, null);
@@ -392,7 +390,7 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
         _handleDrop: function(evt) {
             this._.dragElems = [];
 
-            if (evt.defaultPrevented || !this._.elem || !(evt.target === this._.elem || DOM.contains(this._.elem, evt.target))) {
+            if (evt.defaultPrevented || !this._isValidTarget(evt.target, true)) {
                 return;
             }
 
@@ -403,7 +401,7 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
             });
 
             if (!drop.isDefaultPrevented()) {
-                this._addFiles(evt.dataTransfer.files);
+                this.addFiles(evt.dataTransfer.files);
             }
         },
 
@@ -413,34 +411,28 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
             if (evt.type === 'dragenter') {
                 if (this._.dragElems.indexOf(evt.target) === -1) {
                     this._.dragElems.push(evt.target);
-
                 }
 
                 if (this._.dragElems.length === 1) {
                     this.trigger('body-enter', { files: evt.dataTransfer.files });
-
                 }
 
-                if (evt.target === this._.elem) {
+                if (this._isValidTarget(evt.target)) {
                     this.trigger('zone-enter', { files: evt.dataTransfer.files });
-
                 }
             } else if (evt.type === 'dragleave') {
                 var index = this._.dragElems.indexOf(evt.target);
 
                 if (index > -1) {
                     this._.dragElems.splice(index, 1);
-
                 }
 
-                if (evt.target === this._.elem) {
+                if (this._isValidTarget(evt.target)) {
                     this.trigger('zone-leave');
-
                 }
 
                 if (!this._.dragElems.length) {
                     this.trigger('body-leave');
-
                 }
             }
         },
@@ -448,23 +440,19 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
         _serialize: function(evt) {
             for (var i = 0; i < this._.files.length; i++) {
                 evt.data.append(this._.options.fieldName, this._.files[i]);
-
             }
         },
 
         _formatAccept: function(allowedTypes) {
             return allowedTypes.join(',');
-
         },
 
         _normalizeTypes: function(allowedTypes) {
             if (typeof allowedTypes === 'string') {
                 return allowedTypes.trim().split(/\s*,\s*/g);
-
             }
 
             return allowedTypes;
-
         },
 
         _normalizeMaxSize: function(size) {
@@ -474,10 +462,8 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
                 if (unit = size.match(/(k|M|G|T)?B$/)) {
                     unit = unit[1];
                     size = size.replace(/(k|M|G|T)?B$/, '');
-
                 } else {
                     unit = 'B';
-
                 }
 
                 size = parseFloat(size.trim());
@@ -491,7 +477,6 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
             }
 
             return size;
-
         },
 
         _formatErrorMessage: function(type, params) {
@@ -499,11 +484,9 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
 
             if (params) {
                 message = Strings.vsprintf(message, params);
-
             }
 
             return message;
-
         }
     });
 
