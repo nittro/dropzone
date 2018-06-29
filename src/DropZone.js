@@ -1,6 +1,192 @@
 _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, Strings) {
 
-    var anonId = 0;
+    var anonId = 0,
+        zones = [],
+        state = null;
+
+    function register(zone) {
+        if (zones.indexOf(zone) < 0) {
+            zones.push(zone);
+        }
+
+        if (zones.length === 1) {
+            DOM.addListener(document, 'dragenter', handleDragEnter);
+            DOM.addListener(document, 'dragover', handleDragOver);
+            DOM.addListener(document, 'dragleave', handleDragLeave);
+            DOM.addListener(document, 'drop', handleDrop);
+        }
+    }
+
+    function unregister(zone) {
+        var i = zones.indexOf(zone);
+
+        if (i > -1) {
+            zones.splice(i, 1);
+        }
+
+        if (!zones.length) {
+            DOM.removeListener(document, 'dragenter', handleDragEnter);
+            DOM.removeListener(document, 'dragover', handleDragOver);
+            DOM.removeListener(document, 'dragleave', handleDragLeave);
+            DOM.removeListener(document, 'drop', handleDrop);
+        }
+    }
+
+    function findValidZones(evt) {
+        if (!evt.dataTransfer.items) {
+            return zones;
+        }
+
+        var items = evt.dataTransfer.items,
+            types = [],
+            i, n = items.length;
+
+        for (i = 0; i < n; i++) {
+            if (items[i].kind === 'file') {
+                if (items[i].type === 'application/x-moz-file') {
+                    return zones; // damn firefox
+                } else if (types.indexOf(items[i].type) < 0) {
+                    types.push(items[i].type);
+                }
+            }
+        }
+
+        return !types.length ? zones : zones.filter(function (zone) {
+            return zone.hasAllowedType(types);
+        });
+    }
+
+    function findTargetZones(zones, target) {
+        return zones.filter(function (zone) {
+            return zone.hasTarget(target);
+        });
+    }
+
+    function handleDrop(evt) {
+        if (evt.defaultPrevented) {
+            state = null;
+            return;
+        }
+
+        evt.preventDefault();
+        state = null;
+
+        zones.forEach(function(zone) {
+            var target = zone.getTarget(evt.target),
+                e;
+
+            if (target) {
+                e = zone.trigger('drop', {
+                    files: evt.dataTransfer.files,
+                    target: target
+                });
+
+                if (!e.isDefaultPrevented()) {
+                    zone.addFiles(evt.dataTransfer.files);
+                }
+            }
+        });
+    }
+
+    function handleDragEnter(evt) {
+        evt.preventDefault();
+
+        var s = getState(evt),
+            n = s.path.length,
+            elem, i, j, p;
+
+        if (!n) {
+            trigger(s.validZones, 'body-enter');
+        }
+
+        for (i = 0; i < n; i++) {
+            if (evt.target === s.path[i] || DOM.contains(s.path[i], evt.target)) {
+                break;
+            }
+        }
+
+        if (i > 0) {
+            for (j = 0; j < i; j++) {
+                trigger(findTargetZones(s.validZones, s.path[j]), 'zone-leave', {
+                    target: s.path[j]
+                });
+            }
+
+            s.path.splice(0, i);
+        }
+
+        if (s.path[0] !== evt.target) {
+            elem = evt.target;
+            p = [elem];
+            i = 0;
+
+            for (; elem.parentNode && elem.parentNode !== s.path[0]; i++) {
+                p.push(elem = elem.parentNode);
+            }
+
+            for (; i >= 0; i--) {
+                trigger(findTargetZones(s.validZones, p[i]), 'zone-enter', {
+                    target: p[i]
+                });
+            }
+
+            p.unshift(0, 0);
+            s.path.splice.apply(s.path, p);
+        }
+    }
+
+    function handleDragLeave(evt) {
+        evt.preventDefault();
+
+        if (evt.target === document.body || evt.target === document.documentElement) {
+            leaveAll(getState(evt));
+        }
+    }
+
+    function handleDragOver(evt) {
+        evt.preventDefault();
+
+        if (state) {
+            state.tmr && window.clearTimeout(state.tmr);
+            state.tmr = window.setTimeout(handleDragOverTimeout, 250);
+        }
+    }
+
+    function handleDragOverTimeout() {
+        if (state) {
+            state.tmr && window.clearTimeout(state.tmr);
+            leaveAll(state);
+        }
+    }
+
+    function leaveAll(s) {
+        var n = s.path.length,
+            i;
+
+        for (i = 0; i < n; i++) {
+            trigger(findTargetZones(s.validZones, s.path[i]), 'zone-leave', {
+                target: s.path[i]
+            });
+        }
+
+        trigger(s.validZones, 'body-leave');
+        state = null;
+    }
+
+    function getState(evt) {
+        return state || (state = {
+            path: [],
+            validZones: findValidZones(evt),
+            tmr: null
+        });
+    }
+
+    function trigger(zones, evt, data) {
+        zones.forEach(function(zone) {
+            zone.trigger(evt, data);
+        });
+    }
+
 
 
     var DropZone = _context.extend('Nittro.Object', function(form, elem, options) {
@@ -10,14 +196,16 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
         this._.elems = [];
         this._.rules = null;
         this._.files = [];
-        this._.dragElems = [];
         this._.options = Arrays.mergeTree({}, DropZone.defaults, options);
+
+        this._.allow = {
+            types: null,
+            extensions: null
+        };
 
         this.validate = this.validate.bind(this);
         this.reset = this.reset.bind(this);
         this._serialize = this._serialize.bind(this);
-        this._handleDragEvent = this._handleDragEvent.bind(this);
-        this._handleDrop = this._handleDrop.bind(this);
         this._handleFieldChange = this._handleFieldChange.bind(this);
 
         if (this._.form) {
@@ -27,14 +215,14 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
 
             this.on('error:default', function(evt) {
                 this._.form.trigger('error', {
-                    element: this._.field || this.getElement(),
+                    element: this._getField() || this.getElement(),
                     message: evt.data.message
                 });
             }.bind(this));
         }
 
         if (this._.options.allowedTypes) {
-            this._.options.allowedTypes = this._normalizeTypes(this._.options.allowedTypes);
+            this.setAllowedTypes(this._.options.allowedTypes);
         }
 
         if (this._.options.maxSize) {
@@ -48,7 +236,7 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
             this._.options.multiple = this._.options.field.multiple;
 
             if (this._.options.field.accept) {
-                this._.options.allowedTypes = this._normalizeTypes(this._.options.field.accept);
+                this.setAllowedTypes(this._.options.field.accept);
             } else if (this._.options.allowedTypes) {
                 this._.options.field.accept = this._formatAccept(this._.options.allowedTypes);
             }
@@ -107,29 +295,14 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
         },
 
         attach: function(elem) {
-            this._.dragElems = [];
             this._.elems.push(elem);
-
-            if (this._.elems.length === 1) {
-                DOM.addListener(document.body, 'dragenter', this._handleDragEvent);
-                DOM.addListener(document.body, 'dragover', this._handleDragEvent);
-                DOM.addListener(document.body, 'dragleave', this._handleDragEvent);
-                DOM.addListener(document.body, 'drop', this._handleDrop);
-            }
-
+            register(this);
             return this;
         },
 
         detach: function() {
-            if (this._.elems.length) {
-                DOM.removeListener(document.body, 'dragenter', this._handleDragEvent);
-                DOM.removeListener(document.body, 'dragover', this._handleDragEvent);
-                DOM.removeListener(document.body, 'dragleave', this._handleDragEvent);
-                DOM.removeListener(document.body, 'drop', this._handleDrop);
-                this._.dragElems = [];
-                this._.elems = [];
-            }
-
+            this._.elems = [];
+            unregister(this);
             return this;
         },
 
@@ -147,6 +320,23 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
 
         setAllowedTypes: function(allowedTypes) {
             this._.options.allowedTypes = allowedTypes ? this._normalizeTypes(allowedTypes) : null;
+
+            var types = [],
+                extensions = [],
+                t, i, n = this._.options.allowedTypes.length;
+
+            for (i = 0; i < n; i++) {
+                t = this._.options.allowedTypes[i];
+
+                if (t.charAt(0) === '.') {
+                    extensions.push(Strings.escapeRegex(t.substr(1)));
+                } else {
+                    types.push(Strings.escapeRegex(t).replace(/\/\\\*$/, '/.+'));
+                }
+            }
+
+            this._.allow.types = types.length ? new RegExp('^(' + types.join('|') + ')$', 'i') : null;
+            this._.allow.extensions = extensions.length ? new RegExp('\\.(' + extensions.join('|') + ')$', 'i') : null;
             return this;
         },
 
@@ -228,6 +418,8 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
                 this.addFile(files instanceof FileList ? files.item(i) : files[i]);
             }
 
+            this.trigger('files-added');
+
             return this;
         },
 
@@ -260,12 +452,10 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
         removeFile: function(file) {
             if (typeof file !== 'number') {
                 file = this._.files.indexOf(file);
-
             }
 
             if (file >= 0 && file < this._.files.length) {
                 this._.files.splice(file, 1);
-
             }
 
             return this;
@@ -294,18 +484,15 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
 
             if (this._hasField()) {
                 DOM.removeListener(document, 'change', this._handleFieldChange);
-
             }
         },
 
         validate: function(evt) {
-            if (this._.options.netteValidate.perFile && this._hasField() && this._.rules && !Vendor.validateControl(this._getField(), this._.rules, false, { value: this._.files })) {
+            if (this._.options.netteValidate.onSubmit && this._hasField() && this._.rules && !Vendor.validateControl(this._getField(), this._.rules, false, { value: this._.files })) {
                 evt.preventDefault();
-
             } else if (this._.options.required && !this._.files.length) {
                 evt.preventDefault();
                 this.trigger('error', { message: this._formatErrorMessage('empty') });
-
             }
         },
 
@@ -316,18 +503,29 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
             while (bytes > 1024 && units.length) {
                 unit = units.shift();
                 bytes /= 1024;
-
             }
 
             return (unit === 'B' ? bytes : bytes.toFixed(2)) + ' ' + unit;
-
         },
 
-        _isValidTarget: function (elem, withDescendants) {
-            return this._.elems.length > 0 && (
-                this._.elems.indexOf(elem) > -1 ||
-                withDescendants && this._.elems.some(function(el) { return DOM.contains(el, elem); })
-            );
+        hasTarget: function (elem) {
+            return this._.elems.indexOf(elem) > -1;
+        },
+
+        getTarget: function (elem) {
+            for (var i = 0, n = this._.elems.length; i < n; i++) {
+                if (this._.elems[i] === elem || DOM.contains(this._.elems[i], elem)) {
+                    return this._.elems[i];
+                }
+            }
+
+            return null;
+        },
+
+        hasAllowedType: function (types) {
+            return !this._.allow.types || types.some(function(type) {
+                return this._.allow.types.test(type);
+            }.bind(this));
         },
 
         _hasField: function () {
@@ -338,34 +536,21 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
             return this._.options.field ? DOM.getById(this._.options.field) : null;
         },
 
-        _validateFile: function(file) {
-            if (this._.options.netteValidate.perFile && this._hasField() && this._.rules && !Vendor.validateControl(this._getField(), this._.rules, false, { value: [file] })) {
+        _validateFile: function(file, onlyCheck) {
+            if (this._.options.netteValidate.perFile && this._hasField() && this._.rules && !Vendor.validateControl(this._getField(), this._.rules, onlyCheck === true, { value: [file] })) {
                 throw new NetteValidationError();
-
             } else if (!this._validateType(file.name, file.type)) {
                 throw new ValidationError(this._formatErrorMessage('invalidType', [file.name, file.type]));
-
             } else if (!this._validateSize(file.size)) {
                 throw new ValidationError(this._formatErrorMessage('exceededSize', [file.name, this.formatSize(file.size), this.formatSize(this._.options.maxSize)]));
-
             }
         },
 
         _validateType: function(name, type) {
-            if (!this._.options.allowedTypes) {
-                return true;
-
-            }
-
-            return this._.options.allowedTypes.some(function(pattern) {
-                if (pattern.charAt(0) === '.') {
-                    return !name || name.match(new RegExp(Strings.escapeRegex(pattern) + '$', 'i'));
-
-                } else {
-                    return !type || type.match(new RegExp('^' + Strings.escapeRegex(pattern).replace(/\/\\\*$/, '/.+') + '$', 'i'));
-
-                }
-            });
+            return !(
+                this._.allow.types && type && !this._.allow.types.test(type)
+                || this._.allow.extensions && name && !this._.allow.extensions.test(name)
+            );
         },
 
         _validateSize: function(size) {
@@ -379,61 +564,10 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
 
                     if (this._.form) {
                         this._.form.setValue(this._.options.fieldName, null);
-
                     } else {
                         var html = evt.target.parentNode.innerHTML;
                         DOM.html(evt.target.parentNode, html);
                     }
-                }
-            }
-        },
-
-        _handleDrop: function(evt) {
-            this._.dragElems = [];
-
-            if (evt.defaultPrevented || !this._isValidTarget(evt.target, true)) {
-                return;
-            }
-
-            evt.preventDefault();
-
-            var drop = this.trigger('drop', {
-                files: evt.dataTransfer.files
-            });
-
-            if (!drop.isDefaultPrevented()) {
-                this.addFiles(evt.dataTransfer.files);
-            }
-        },
-
-        _handleDragEvent: function(evt) {
-            evt.preventDefault();
-
-            if (evt.type === 'dragenter') {
-                if (this._.dragElems.indexOf(evt.target) === -1) {
-                    this._.dragElems.push(evt.target);
-                }
-
-                if (this._.dragElems.length === 1) {
-                    this.trigger('body-enter', { files: evt.dataTransfer.files });
-                }
-
-                if (this._isValidTarget(evt.target)) {
-                    this.trigger('zone-enter', { files: evt.dataTransfer.files });
-                }
-            } else if (evt.type === 'dragleave') {
-                var index = this._.dragElems.indexOf(evt.target);
-
-                if (index > -1) {
-                    this._.dragElems.splice(index, 1);
-                }
-
-                if (this._isValidTarget(evt.target)) {
-                    this.trigger('zone-leave');
-                }
-
-                if (!this._.dragElems.length) {
-                    this.trigger('body-leave');
                 }
             }
         },
