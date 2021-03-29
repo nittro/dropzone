@@ -69,7 +69,6 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
         }
 
         evt.preventDefault();
-        state = null;
 
         zones.forEach(function(zone) {
             var target = zone.getTarget(evt.target),
@@ -84,8 +83,12 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
                 if (!e.isDefaultPrevented()) {
                     zone.addFiles(evt.dataTransfer.files);
                 }
+            } else if (state && state.validZones.indexOf(zone) > -1) {
+                zone.trigger('body-leave');
             }
         });
+
+        state = null;
     }
 
     function handleDragEnter(evt) {
@@ -395,12 +398,12 @@ _context.invoke('Nittro.Extras.DropZone', function(Form, Vendor, DOM, Arrays, St
 
                 reader.onload = function() {
                     image.src = reader.result;
-                    fulfill(image);
                 };
 
-                reader.onerror = function() {
-                    reject();
-                };
+                reader.onerror = reject;
+
+                image.onload = fulfill.bind(null, image);
+                image.onerror = reject;
 
                 reader.readAsDataURL(file);
             });
